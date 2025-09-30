@@ -29,14 +29,14 @@ log_prompt() {
 }
 
 # Banner
-echo "==================================================="
-echo "     Cafe Grader Installation Script"
-echo "==================================================="
-echo ""
+echo -e "==================================================="
+echo -e "     Cafe Grader Installation Script"
+echo -e "==================================================="
+echo -e ""
 
 # Prompt for database configuration
 log_info "Database Configuration Setup"
-echo ""
+echo -e ""
 
 # Database name
 log_prompt "Enter the main database name (default: grader):"
@@ -57,7 +57,7 @@ DB_USER=${DB_USER:-grader_user}
 while true; do
     log_prompt "Enter the database password (default: grader_pass):"
     read -s -p "Database password: " DB_PASS
-    echo ""
+    echo -e ""
     
     if [ -z "$DB_PASS" ]; then
         DB_PASS="grader_pass"
@@ -65,7 +65,7 @@ while true; do
     fi
     
     read -s -p "Confirm password: " DB_PASS_CONFIRM
-    echo ""
+    echo -e ""
     
     if [ "$DB_PASS" = "$DB_PASS_CONFIRM" ]; then
         break
@@ -75,8 +75,8 @@ while true; do
 done
 
 # Linux user
-LINUX_USER=$(whoami)
-log_prompt "Installation will run as user: $LINUX_USER"
+USER=$(whoami)
+log_prompt "Installation will run as user: $USER"
 read -p "Press Enter to continue or Ctrl+C to abort..."
 
 # Installation directory
@@ -97,17 +97,17 @@ log_prompt "Web server port (default: 3000):"
 read -p "Port: " WEB_PORT
 WEB_PORT=${WEB_PORT:-3000}
 
-echo ""
+echo -e ""
 log_info "Configuration Summary:"
-echo "  Database Name:       $DB_NAME"
-echo "  Queue Database:      $DB_QUEUE_NAME"
-echo "  Database User:       $DB_USER"
-echo "  Database Password:   [hidden]"
-echo "  Linux User:          $LINUX_USER"
-echo "  Install Directory:   $INSTALL_DIR"
-echo "  Grader Workers:      $NUM_WORKERS"
-echo "  Web Port:            $WEB_PORT"
-echo ""
+echo -e "  Database Name:       $DB_NAME"
+echo -e "  Queue Database:      $DB_QUEUE_NAME"
+echo -e "  Database User:       $DB_USER"
+echo -e "  Database Password:   [hidden]"
+echo -e "  Linux User:          $USER"
+echo -e "  Install Directory:   $INSTALL_DIR"
+echo -e "  Grader Workers:      $NUM_WORKERS"
+echo -e "  Web Port:            $WEB_PORT"
+echo -e ""
 read -p "Continue with installation? (y/n): " CONFIRM
 if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
     log_error "Installation aborted by user"
@@ -148,7 +148,7 @@ log_info "Step 4: Installing RVM..."
 sudo apt-add-repository -y ppa:rael-gc/rvm
 sudo apt update
 sudo apt install -y rvm
-sudo usermod -a -G rvm $LINUX_USER
+sudo usermod -a -G rvm $USER
 
 log_warn "RVM group added. You may need to log out and log back in for group changes to take effect."
 
@@ -242,10 +242,9 @@ else
     log_warn "Cafe Grader web directory already exists, skipping clone"
 fi
 
-cd "$INSTALL_DIR/web"
-
 # 9. Install Ruby
 log_info "Step 9: Installing Ruby..."
+cd "$INSTALL_DIR/web"
 if [ -f .ruby-version ]; then
     RUBY_VERSION=$(cat .ruby-version | tr -d '[:space:]')
     log_info "Installing Ruby ${RUBY_VERSION}..."
@@ -254,7 +253,6 @@ if [ -f .ruby-version ]; then
     if [ -f /etc/profile.d/rvm.sh ]; then
         source /etc/profile.d/rvm.sh
         rvm install ${RUBY_VERSION}
-        rvm use ${RUBY_VERSION}
     else
         log_error "RVM not properly sourced. Please log out and log back in, then run this script again."
         exit 1
@@ -264,10 +262,11 @@ else
     exit 1
 fi
 
+
 # 10. Bundle install
-log_info "Step 10: Running bundle install..."
-gem install bundler
-bundle install
+log_info "Step 10: Running bundle..."
+cd "$INSTALL_DIR/web"
+bundle
 
 # 11. Copy and configure config files
 log_info "Step 11: Configuring application..."
@@ -363,7 +362,8 @@ EDITOR=nano rails credentials:edit
 
 # Setup database
 log_info "Setting up database schema..."
-rails db:setup DISABLE_DATABASE_ENVIRONMENT_CHECK=1 RAILS_ENV=production
+rails db:create RAILS_ENV=production
+rails db:migrate RAILS_ENV=production
 rails db:seed RAILS_ENV=production
 
 # Setup yarn
@@ -384,7 +384,7 @@ Description=Solid Queue for cafe-grader
 After=network.target
 
 [Service]
-User=$LINUX_USER
+User=$USER
 WorkingDirectory=$INSTALL_DIR/web
 ExecStart=/bin/bash -lc 'bundle exec rails solid_queue:start'
 Environment=RAILS_ENV=production
@@ -400,10 +400,9 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable solid_queue
 
-# 14. Setup grader process and cron jobs
-log_info "Step 14: Setting up grader process and cron jobs..."
+# 14. Setup cron jobs
+log_info "Step 14: Setting up cron jobs..."
 cd "$INSTALL_DIR/web"
-RAILS_ENV=production rails r "Grader.restart($NUM_WORKERS)"
 bundle exec whenever --update-crontab
 
 # Add cleanup cron job
@@ -415,7 +414,7 @@ cat > "$INSTALL_DIR/installation_config.txt" <<EOF
 Cafe Grader Installation Configuration
 =======================================
 Installation Date: $(date)
-Installation User: $LINUX_USER
+Installation User: $USER
 Installation Directory: $INSTALL_DIR
 
 Database Configuration:
@@ -446,11 +445,20 @@ log_info "Creating helper scripts..."
 
 # Start script
 cat > "$INSTALL_DIR/start_grader.sh" <<EOF
-#!/bin/bash
+#!/bin/bash -l
 cd $INSTALL_DIR/web
+
+# Start Solid Queue service
 sudo systemctl start solid_queue
+
+# Start grader workers
+RAILS_ENV=production rails r "Grader.restart($NUM_WORKERS)"
+
+# Start Rails server
 RAILS_ENV=production rails server -b 0.0.0.0 -p $WEB_PORT -d
+
 echo "Cafe Grader started on http://localhost:$WEB_PORT"
+echo "Grader workers: $NUM_WORKERS"
 EOF
 chmod +x "$INSTALL_DIR/start_grader.sh"
 
@@ -476,39 +484,56 @@ chmod +x "$INSTALL_DIR/status_grader.sh"
 
 # Final completion message
 log_info "Installation completed successfully!"
-echo ""
-echo "==================================================="
-echo "     Cafe Grader Installation Complete!"
-echo "==================================================="
-echo ""
+echo -e ""
+echo -e "==================================================="
+echo -e "     Cafe Grader Installation Complete!"
+echo -e "==================================================="
+echo -e ""
 log_info "Configuration Details:"
-echo "  Database:        $DB_NAME / $DB_QUEUE_NAME"
-echo "  Database User:   $DB_USER"
-echo "  Install Dir:     $INSTALL_DIR"
-echo "  Workers:         $NUM_WORKERS"
-echo "  Web Port:        $WEB_PORT"
-echo ""
+echo -e "  Database:        $DB_NAME / $DB_QUEUE_NAME"
+echo -e "  Database User:   $DB_USER"
+echo -e "  Install Dir:     $INSTALL_DIR"
+echo -e "  Workers:         $NUM_WORKERS"
+echo -e "  Web Port:        $WEB_PORT"
+echo -e ""
 log_warn "IMPORTANT: Next Steps"
-echo ""
-echo "1. REBOOT your system (required for kernel changes):"
-echo "   ${GREEN}sudo reboot${NC}"
-echo ""
-echo "2. After reboot, start Cafe Grader:"
-echo "   ${GREEN}$INSTALL_DIR/start_grader.sh${NC}"
-echo "   OR manually:"
-echo "   ${GREEN}cd $INSTALL_DIR/web${NC}"
-echo "   ${GREEN}sudo systemctl start solid_queue${NC}"
-echo "   ${GREEN}RAILS_ENV=production rails server -b 0.0.0.0 -p $WEB_PORT -d${NC}"
-echo ""
-echo "3. Access the application:"
-echo "   ${BLUE}http://localhost:$WEB_PORT${NC}"
-echo ""
+echo -e ""
+echo -e "1. REBOOT your system (required for kernel changes):"
+echo -e "   ${GREEN}sudo reboot${NC}"
+echo -e ""
+echo -e "2. After reboot, start Cafe Grader:"
+echo -e "   ${GREEN}$INSTALL_DIR/start_grader.sh${NC}"
+echo -e "   OR manually:"
+echo -e "   ${GREEN}cd $INSTALL_DIR/web${NC}"
+echo -e "   ${GREEN}sudo systemctl start solid_queue${NC}"
+echo -e "   ${GREEN}RAILS_ENV=production rails server -b 0.0.0.0 -p $WEB_PORT -d${NC}"
+echo -e ""
+echo -e "3. Access the application:"
+echo -e "   ${BLUE}http://localhost:$WEB_PORT${NC}"
+echo -e ""
 log_info "Helper Scripts Created:"
-echo "  Start:  $INSTALL_DIR/start_grader.sh"
-echo "  Stop:   $INSTALL_DIR/stop_grader.sh"
-echo "  Status: $INSTALL_DIR/status_grader.sh"
-echo ""
+echo -e "  Start:  $INSTALL_DIR/start_grader.sh"
+echo -e "  Stop:   $INSTALL_DIR/stop_grader.sh"
+echo -e "  Status: $INSTALL_DIR/status_grader.sh"
+echo -e ""
 log_info "Configuration saved to:"
-echo "  $INSTALL_DIR/installation_config.txt"
-echo ""
-echo "==================================================="
+echo -e "  $INSTALL_DIR/installation_config.txt"
+echo -e ""
+log_warn "RECOMMENDED: After reboot, verify isolate environment:"
+echo -e "   ${GREEN}isolate-check-environment${NC}"
+echo -e ""
+echo -e "Expected output should include:"
+echo -e "  Using cgroup root: /sys/fs/cgroup/isolate.slice/isolate.service"
+echo -e "  Checking for cgroup support for cpuset.cpus ... ${GREEN}PASS${NC}"
+echo -e "  Checking for cgroup support for cpuset.mems ... ${GREEN}PASS${NC}"
+echo -e "  Checking for cgroup support for cpu.stat ... ${GREEN}PASS${NC}"
+echo -e "  Checking for cgroup support for cgroup.procs ... ${GREEN}PASS${NC}"
+echo -e "  Checking for cgroup support for memory.events ... ${GREEN}PASS${NC}"
+echo -e "  Checking for cgroup support for memory.max ... ${GREEN}PASS${NC}"
+echo -e "  Checking for swap ... ${GREEN}PASS${NC}"
+echo -e "  Checking for kernel address space randomisation ... ${GREEN}PASS${NC}"
+echo -e "  Checking for transparent hugepage support ... ${GREEN}PASS${NC}"
+echo -e "  Checking for core file pattern ... ${GREEN}PASS${NC}"
+echo -e "  And other ${GREEN}PASS${NC}/SKIPPED results..."
+echo -e ""
+echo -e "==================================================="
