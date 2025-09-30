@@ -173,7 +173,7 @@ log_info "MySQL databases created successfully"
 
 # 6. Install IOI/Isolate
 log_info "Step 6: Installing IOI/Isolate..."
-cd /tmp
+cd $HOME
 if [ ! -d "isolate" ]; then
     git clone https://github.com/ioi/isolate.git
 fi
