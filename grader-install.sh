@@ -222,10 +222,15 @@ echo 'kernel.randomize_va_space=0' | sudo tee /etc/sysctl.d/99-sysctl.conf > /de
 
 # Configure GRUB
 log_info "Configuring GRUB for cgroup memory..."
-if ! grep -q "cgroup_enable=memory" /etc/default/grub; then
-    sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="[^"]*/& cgroup_enable=memory/' /etc/default/grub
-    sudo update-grub
-    log_warn "GRUB updated. System reboot required after installation completes."
+if [ -f /etc/default/grub ]; then
+    if ! grep -q "cgroup_enable=memory" /etc/default/grub; then
+        sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="[^"]*/& cgroup_enable=memory/' /etc/default/grub
+        sudo update-grub
+        log_warn "GRUB updated. System reboot required after installation completes."
+    fi
+else
+    log_warn "GRUB configuration file not found (/etc/default/grub). Skipping GRUB configuration."
+    log_warn "You may need to manually configure cgroup_enable=memory in your bootloader."
 fi
 
 # 8. Clone Cafe Grader
