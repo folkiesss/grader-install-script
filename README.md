@@ -10,7 +10,6 @@ This script automates the complete installation and configuration of Cafe Grader
 
 - **Fully Automated**: One-script installation with interactive configuration
 - **Complete Setup**: Installs all dependencies, configures services, and sets up databases
-- **Production Ready**: Configures systemd services, security settings, and performance optimizations
 - **Helper Scripts**: Generates start/stop/status scripts for easy management
 - **Secure Configuration**: Sets up proper user permissions and database security
 
@@ -105,21 +104,7 @@ Your installation details are saved to:
 After installation and reboot:
 1. Start the services: `~/cafe-grader/start_grader.sh`
 2. Open your browser to: `http://localhost:3000` (or your configured port)
-3. Default admin login is typically created during the seed process
-
-## System Requirements
-
-### Minimum
-- 2 CPU cores
-- 4GB RAM
-- 10GB disk space
-- Ubuntu 18.04+
-
-### Recommended
-- 4+ CPU cores
-- 8GB+ RAM
-- 20GB+ disk space
-- SSD storage for better I/O performance
+3. Default credential is `root` with password `ioionrails`
 
 ## Troubleshooting
 
@@ -183,4 +168,3 @@ This installation script is provided as-is for educational and development purpo
 
 - [Cafe Grader](https://github.com/nattee/cafe-grader-web) - The main grading platform
 - [IOI Isolate](https://github.com/ioi/isolate) - Secure sandbox system
-- Ubuntu/Debian communities for package management and system tools
