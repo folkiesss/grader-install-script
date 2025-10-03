@@ -40,7 +40,7 @@ This script automates the complete installation and configuration of Cafe Grader
 
 5. **Start Cafe Grader:**
    ```bash
-   ~/cafe_grader/start_grader.sh
+   ~/cafe-grader/start_grader.sh
    ```
 
 ## Configuration Options
@@ -53,7 +53,7 @@ During installation, you'll be prompted to configure:
 | Queue Database Name | `grader_queue` | Queue management database |
 | Database Username | `grader_user` | MySQL user for the application |
 | Database Password | `grader_pass` | MySQL password (hidden input) |
-| Installation Directory | `~/cafe_grader` | Where to install the application |
+| Installation Directory | `~/cafe-grader` | Where to install the application |
 | Number of Workers | `4` | Grader worker processes |
 | Web Server Port | `3000` | HTTP port for the web interface |
 
@@ -88,22 +88,22 @@ During installation, you'll be prompted to configure:
 The installer creates convenient management scripts in your installation directory:
 
 ```bash
-~/cafe_grader/start_grader.sh    # Start all services
-~/cafe_grader/stop_grader.sh     # Stop all services
-~/cafe_grader/status_grader.sh   # Check service status
+~/cafe-grader/start_grader.sh    # Start all services
+~/cafe-grader/stop_grader.sh     # Stop all services
+~/cafe-grader/status_grader.sh   # Check service status
 ```
 
 ### Configuration Files
 
 Your installation details are saved to:
-- `~/cafe_grader/installation_config.txt` - Complete configuration record
-- `~/cafe_grader/web/config/database.yml` - Database configuration
-- `~/cafe_grader/web/config/worker.yml` - Worker configuration
+- `~/cafe-grader/installation_config.txt` - Complete configuration record
+- `~/cafe-grader/web/config/database.yml` - Database configuration
+- `~/cafe-grader/web/config/worker.yml` - Worker configuration
 
 ### Accessing the Application
 
 After installation and reboot:
-1. Start the services: `~/cafe_grader/start_grader.sh`
+1. Start the services: `~/cafe-grader/start_grader.sh`
 2. Open your browser to: `http://localhost:3000` (or your configured port)
 3. Default admin login is typically created during the seed process
 
@@ -140,7 +140,7 @@ sudo systemctl status isolate
 
 # Restart services:
 sudo systemctl restart solid_queue
-~/cafe_grader/start_grader.sh
+~/cafe-grader/start_grader.sh
 ```
 
 **Database connection errors:**
@@ -155,7 +155,7 @@ mysql -u grader_user -p grader
 ### Log Files
 
 Check these locations for debugging:
-- Application logs: `~/cafe_grader/web/log/`
+- Application logs: `~/cafe-grader/web/log/`
 - System logs: `sudo journalctl -u solid_queue`
 - Installation output: Terminal output during script execution
 
