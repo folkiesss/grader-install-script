@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 # Cafe Grader Automated Installation Script
 # This script automates the installation of Cafe Grader system
 
@@ -33,6 +33,49 @@ echo -e "==================================================="
 echo -e "     Cafe Grader Installation Script"
 echo -e "==================================================="
 echo -e ""
+
+# Check if we're resuming from RVM installation
+RESUME_FILE="$HOME/.grader_install_resume"
+if [ -f "$RESUME_FILE" ]; then
+    log_info "Resuming installation from previous session..."
+    source "$RESUME_FILE"
+    log_info "Configuration loaded from previous session"
+    echo -e ""
+    log_info "Previous Configuration:"
+    echo -e "  Database Name:       $DB_NAME"
+    echo -e "  Queue Database:      $DB_QUEUE_NAME"
+    echo -e "  Database User:       $DB_USER"
+    echo -e "  Database Password:   [hidden]"
+    echo -e "  Linux User:          $USER"
+    echo -e "  Install Directory:   $INSTALL_DIR"
+    echo -e "  Grader Workers:      $NUM_WORKERS"
+    echo -e "  Web Port:            $WEB_PORT"
+    echo -e ""
+    while true; do
+        read -p "Continue with these settings? (y/n): " RESUME_CONFIRM
+        case "$RESUME_CONFIRM" in
+            [Yy]* )
+                log_info "Continuing installation from Step 5..."
+                rm -f "$RESUME_FILE"
+                jump_to_step5=true
+                break
+                ;;
+            [Nn]* )
+                log_info "Starting fresh installation..."
+                rm -f "$RESUME_FILE"
+                break
+                ;;
+            "" )
+                log_warn "Please select an option: Enter 'y' to continue, 'n' to start fresh, or press Ctrl+C to cancel"
+                ;;
+            * )
+                log_warn "Invalid input. Please enter 'y' to continue, 'n' to start fresh, or press Ctrl+C to cancel"
+                ;;
+        esac
+    done
+fi
+
+if [ "$jump_to_step5" != "true" ]; then
 
 # Prompt for database configuration
 log_info "Database Configuration Setup"
@@ -80,7 +123,7 @@ log_prompt "Installation will run as user: $USER"
 read -p "Press Enter to continue or Ctrl+C to abort..."
 
 # Installation directory
-INSTALL_DIR="$HOME/cafe_grader"
+INSTALL_DIR="$HOME/cafe-grader"
 log_prompt "Installation directory (default: $INSTALL_DIR):"
 read -p "Installation directory: " CUSTOM_DIR
 if [ ! -z "$CUSTOM_DIR" ]; then
@@ -108,51 +151,99 @@ echo -e "  Install Directory:   $INSTALL_DIR"
 echo -e "  Grader Workers:      $NUM_WORKERS"
 echo -e "  Web Port:            $WEB_PORT"
 echo -e ""
-read -p "Continue with installation? (y/n): " CONFIRM
-if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-    log_error "Installation aborted by user"
-    exit 1
+while true; do
+    read -p "Continue with installation? (y/n): " CONFIRM
+    case "$CONFIRM" in
+        [Yy]* )
+            break
+            ;;
+        [Nn]* )
+            log_error "Installation aborted by user"
+            exit 1
+            ;;
+        "" )
+            log_warn "Please select an option: Enter 'y' to continue, 'n' to abort, or press Ctrl+C to cancel"
+            ;;
+        * )
+            log_warn "Invalid input. Please enter 'y' to continue, 'n' to abort, or press Ctrl+C to cancel"
+            ;;
+    esac
+    done
 fi
 
 log_info "Starting Cafe Grader installation..."
 
-# 1. Update system packages
-log_info "Step 1: Updating system packages..."
-sudo apt update && sudo apt upgrade -y
+# Skip to step 5 if resuming from RVM installation
+if [ "$jump_to_step5" = "true" ]; then
+    log_info "Resuming from Step 5 after RVM login..."
+else
+    # 1. Update system packages
+    log_info "Step 1: Updating system packages..."
+    sudo apt update && sudo apt upgrade -y
 
-# 2. Install required packages
-log_info "Step 2: Installing required packages..."
-sudo apt install -y \
-    apache2 \
-    apache2-dev \
-    mysql-server \
-    git \
-    software-properties-common \
-    libmysqlclient-dev \
-    libcap-dev \
-    apt-transport-https \
-    postgresql \
-    postgresql-server-dev-all \
-    unzip \
-    curl \
-    libsystemd-dev
+    # 2. Install required packages
+    log_info "Step 2: Installing required packages..."
+    sudo apt install -y \
+        apache2 \
+        apache2-dev \
+        mysql-server \
+        git \
+        software-properties-common \
+        libmysqlclient-dev \
+        libcap-dev \
+        apt-transport-https \
+        postgresql \
+        postgresql-server-dev-all \
+        unzip \
+        curl \
+        libsystemd-dev
 
-# 3. Install Node.js
-log_info "Step 3: Installing Node.js..."
-curl -sL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
-sudo bash /tmp/nodesource_setup.sh
-sudo apt install -y nodejs
+    # 3. Install Node.js
+    log_info "Step 3: Installing Node.js..."
+    curl -sL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+    sudo bash /tmp/nodesource_setup.sh
+    sudo apt install -y nodejs
 
-# 4. Install RVM
-log_info "Step 4: Installing RVM..."
-sudo apt-add-repository -y ppa:rael-gc/rvm
-sudo apt update
-sudo apt install -y rvm
-sudo usermod -a -G rvm $USER
+    # 4. Install RVM
+    log_info "Step 4: Installing RVM..."
+    sudo apt-add-repository -y ppa:rael-gc/rvm
+    sudo apt update
+    sudo apt install -y rvm
+    sudo usermod -a -G rvm $USER
 
-log_warn "RVM group added. You may need to log out and log back in for group changes to take effect."
+    # Save configuration for resume
+    cat > "$HOME/.grader_install_resume" <<EOF
+DB_NAME="$DB_NAME"
+DB_QUEUE_NAME="$DB_QUEUE_NAME"
+DB_USER="$DB_USER"
+DB_PASS="$DB_PASS"
+USER="$USER"
+INSTALL_DIR="$INSTALL_DIR"
+NUM_WORKERS="$NUM_WORKERS"
+WEB_PORT="$WEB_PORT"
+EOF
 
-# Source RVM
+    log_warn "RVM installed successfully!"
+    log_warn "IMPORTANT: RVM requires you to log out and log back in for group changes to take effect."
+    echo -e ""
+    log_info "To log out:"
+    echo -e "  - If using SSH: ${GREEN}exit${NC} or press ${GREEN}Ctrl+D${NC}"
+    echo -e "  - If using console: ${GREEN}logout${NC} or press ${GREEN}Ctrl+Alt+F1${NC} then log in again"
+    echo -e ""
+    log_info "After logging back in, run:"
+    echo -e "  ${GREEN}cd $(pwd)${NC}"
+    echo -e "  ${GREEN}./grader-install.sh${NC}"
+    echo -e ""
+    log_info "The script will automatically continue from where it left off."
+    exit 0
+fi
+
+# This section runs when resuming from RVM installation
+if [ "$jump_to_step5" = "true" ]; then
+    log_info "Resuming from Step 5 after RVM login..."
+fi
+
+# Source RVM (may not work until relogin)
 if [ -f /etc/profile.d/rvm.sh ]; then
     source /etc/profile.d/rvm.sh
 fi
@@ -253,6 +344,7 @@ if [ -f .ruby-version ]; then
     if [ -f /etc/profile.d/rvm.sh ]; then
         source /etc/profile.d/rvm.sh
         rvm install ${RUBY_VERSION}
+        rvm use ${RUBY_VERSION}
     else
         log_error "RVM not properly sourced. Please log out and log back in, then run this script again."
         exit 1
@@ -264,21 +356,22 @@ fi
 
 
 # 10. Bundle install
-log_info "Step 10: Running bundle..."
+log_info "Step 10: Running bundle install..."
 cd "$INSTALL_DIR/web"
-bundle
+gem install bundler
+bundle install
 
 # 11. Copy and configure config files
 log_info "Step 11: Configuring application..."
 
 # Copy config files
-cp config/application.rb.SAMPLE config/application.rb
-cp config/database.yml.SAMPLE config/database.yml
-cp config/worker.yml.SAMPLE config/worker.yml
+cp $INSTALL_DIR/web/config/application.rb.SAMPLE $INSTALL_DIR/web/config/application.rb
+cp $INSTALL_DIR/web/config/database.yml.SAMPLE $INSTALL_DIR/web/config/database.yml
+cp $INSTALL_DIR/web/config/worker.yml.SAMPLE $INSTALL_DIR/web/config/worker.yml
 
 # Configure database.yml
 log_info "Configuring database.yml..."
-cat > config/database.yml <<EOF
+cat > $INSTALL_DIR/web/config/database.yml <<EOF
 user_pass: &user_pass
   username: $DB_USER
   password: $DB_PASS
@@ -316,7 +409,7 @@ EOF
 
 # Configure worker.yml
 log_info "Configuring worker.yml..."
-cat > config/worker.yml <<EOF
+cat > $INSTALL_DIR/web/config/worker.yml <<EOF
 shared:
   directory:
     isolate_working_dir: /var/local/lib/isolate/
@@ -353,6 +446,7 @@ EOF
 
 # 12. Setup Rails
 log_info "Step 12: Setting up Rails..."
+cd "$INSTALL_DIR/web"
 
 # Setup credentials
 log_warn "You need to setup Rails credentials manually..."
@@ -449,6 +543,7 @@ cat > "$INSTALL_DIR/start_grader.sh" <<EOF
 cd $INSTALL_DIR/web
 
 # Start Solid Queue service
+echo "Starting Solid Queue..."
 sudo systemctl start solid_queue
 
 # Start grader workers
